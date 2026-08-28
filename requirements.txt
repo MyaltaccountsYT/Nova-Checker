@@ -1,0 +1,5 @@
+requests>=2.31.0
+colorama>=0.4.6
+PySocks>=1.7.1
+urllib3>=2.0.0
+pyCraft>=0.7.0
