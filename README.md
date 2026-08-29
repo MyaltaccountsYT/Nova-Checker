@@ -1,4 +1,4 @@
-# Nova Checker Free Version | V0.1
+# Nova Checker Free Version | V0.2
 
 ## Features
 
