@@ -5,6 +5,7 @@ import itertools
 _instance = None
 _lock = threading.Lock()
 
+
 class NovaProxyHandler:
     def __init__(self):
         self._pool = []
@@ -13,6 +14,7 @@ class NovaProxyHandler:
         self._blacklist = set()
         self._pool_lock = threading.Lock()
 
+
 def get_novaproxyhandler():
     global _instance
     if _instance is None:
@@ -20,6 +22,7 @@ def get_novaproxyhandler():
             if _instance is None:
                 _instance = NovaProxyHandler()
     return _instance
+
 
 def load_proxies(filepath="proxy.txt"):
     handler = get_novaproxyhandler()
@@ -40,6 +43,7 @@ def load_proxies(filepath="proxy.txt"):
         handler._cycle = itertools.cycle(proxies) if proxies else None
     return proxies
 
+
 def _normalize_proxy(line):
     if re.match(r"^(http|https|socks4|socks5)://", line, re.I):
         return line
@@ -47,8 +51,9 @@ def _normalize_proxy(line):
         return f"http://{line}"
     if line.count(":") == 3:
         parts = line.split(":")
-        return f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+        return f"http://{parts[0]}:{parts[1]}@{parts[2]}:{parts[3]}"
     return None
+
 
 def get_next_proxy():
     handler = get_novaproxyhandler()
@@ -61,12 +66,14 @@ def get_next_proxy():
                 return proxy
     return None
 
+
 def mark_proxy_failed(proxy_str):
     handler = get_novaproxyhandler()
     with handler._pool_lock:
         handler._failures[proxy_str] = handler._failures.get(proxy_str, 0) + 1
         if handler._failures[proxy_str] >= 3:
             handler._blacklist.add(proxy_str)
+
 
 def is_residential(ip):
     return True

